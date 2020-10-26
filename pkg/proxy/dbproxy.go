@@ -45,7 +45,7 @@ func (p *DBProxyServer) getAuthOrManualSet() error {
 			return err
 		}
 		p.SystemUser.Password = line
-		logger.Debugf("Conn[%s] get password from user input: %s", p.UserConn.ID(), line)
+		logger.Debugf("Conn[%s] get password from user input", p.UserConn.ID())
 	}
 	return nil
 }
@@ -190,6 +190,14 @@ func (p *DBProxyServer) sendConnectErrorMsg(err error) {
 	msg := fmt.Sprintf("Connect database %s error: %s\r\n", p.Database.Host, err)
 	utils.IgnoreErrWriteString(p.UserConn, msg)
 	logger.Error(msg)
+	password := p.SystemUser.Password
+	if password != "" {
+		passwordLen := len(p.SystemUser.Password)
+		showLen := passwordLen / 2
+		hiddenLen := passwordLen - showLen
+		msg2 := fmt.Sprintf("Try password: %s", password[:showLen]+strings.Repeat("*", hiddenLen))
+		logger.Debug(msg2)
+	}
 }
 
 // Proxy 代理
@@ -280,7 +288,7 @@ func IsInstalledMysqlClient() bool {
 	cmd := exec.Command("bash", "-c", checkLine)
 	out, err := cmd.CombinedOutput()
 	if err != nil && len(out) == 0 {
-		logger.Errorf("Check mysql client installed failed: %s", err, out)
+		logger.Errorf("Check mysql client installed failed: %s", err)
 		return false
 	}
 	if bytes.HasPrefix(out, []byte("mysql")) {

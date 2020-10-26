@@ -193,7 +193,7 @@ func (p *K8sProxyServer) GenerateRecordCommand(s *commonSwitch, input, output st
 }
 
 func (p *K8sProxyServer) NewParser(s *commonSwitch) ParseEngine {
-	shellParser := newParser(s.ID)
+	shellParser := newParser(s.ID, p.SystemUser.Protocol)
 	msg := i18n.T("Create k8s session failed")
 	if cmdRules, err := service.GetSystemUserFilterRules(p.SystemUser.ID); err == nil {
 		shellParser.SetCMDFilterRules(cmdRules)
@@ -213,7 +213,7 @@ func (p *K8sProxyServer) MapData(s *commonSwitch) map[string]interface{} {
 	return map[string]interface{}{
 		"id":             s.ID,
 		"user":           fmt.Sprintf("%s (%s)", p.User.Name, p.User.Username),
-		"asset":          p.Cluster.Cluster,
+		"asset":          p.Cluster.Name,
 		"org_id":         p.Cluster.OrgID,
 		"login_from":     p.UserConn.LoginFrom(),
 		"system_user":    fmt.Sprintf("%s (%s)", p.SystemUser.Name, p.SystemUser.Username),
@@ -234,7 +234,7 @@ func IsInstalledKubectlClient() bool {
 	cmd := exec.Command("bash", "-c", checkLine)
 	out, err := cmd.CombinedOutput()
 	if err != nil && len(out) == 0 {
-		logger.Errorf("Check kubectl client failed %s", err, out)
+		logger.Errorf("Check kubectl client failed %s", err)
 		return false
 	}
 	var result map[string]interface{}
