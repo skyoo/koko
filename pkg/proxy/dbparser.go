@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/jumpserver/koko/pkg/i18n"
@@ -60,7 +61,7 @@ func (p *DBParser) initial() {
 }
 
 // ParseStream 解析数据流
-func (p *DBParser) ParseStream(userInChan, srvInChan <-chan []byte) (userOut, srvOut <-chan []byte) {
+func (p *DBParser) ParseStream(userInChan chan *model.RoomMessage, srvInChan <-chan []byte) (userOut, srvOut <-chan []byte) {
 
 	p.userOutputChan = make(chan []byte, 1)
 	p.srvOutputChan = make(chan []byte, 1)
@@ -78,9 +79,14 @@ func (p *DBParser) ParseStream(userInChan, srvInChan <-chan []byte) (userOut, sr
 			select {
 			case <-p.closed:
 				return
-			case b, ok := <-userInChan:
+			case msg, ok := <-userInChan:
 				if !ok {
 					return
+				}
+				var b []byte
+				switch msg.Event {
+				case model.DataEvent:
+					b = msg.Body
 				}
 				b = p.ParseUserInput(b)
 				select {
@@ -136,12 +142,17 @@ func (p *DBParser) parseInputState(b []byte) []byte {
 
 // parseCmdInput 解析命令的输入
 func (p *DBParser) parseCmdInput() {
-	p.command = p.cmdInputParser.Parse()
+	commands := p.cmdInputParser.Parse()
+	if len(commands) <= 0 {
+		p.command = ""
+	} else {
+		p.command = commands[len(commands)-1]
+	}
 }
 
 // parseCmdOutput 解析命令输出
 func (p *DBParser) parseCmdOutput() {
-	p.output = p.cmdOutputParser.Parse()
+	p.output = strings.Join(p.cmdOutputParser.Parse(), "\r\n")
 }
 
 // ParseUserInput 解析用户的输入

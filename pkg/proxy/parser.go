@@ -3,12 +3,14 @@ package proxy
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"sync"
+
+	"github.com/LeeEirc/tclientlib"
 
 	"github.com/jumpserver/koko/pkg/i18n"
 	"github.com/jumpserver/koko/pkg/logger"
 	"github.com/jumpserver/koko/pkg/model"
-	"github.com/jumpserver/koko/pkg/srvconn/telnetlib"
 	"github.com/jumpserver/koko/pkg/utils"
 )
 
@@ -87,7 +89,7 @@ func (p *Parser) initial() {
 }
 
 // ParseStream 解析数据流
-func (p *Parser) ParseStream(userInChan, srvInChan <-chan []byte) (userOut, srvOut <-chan []byte) {
+func (p *Parser) ParseStream(userInChan chan *model.RoomMessage, srvInChan <-chan []byte) (userOut, srvOut <-chan []byte) {
 
 	p.userOutputChan = make(chan []byte, 1)
 	p.srvOutputChan = make(chan []byte, 1)
@@ -105,9 +107,17 @@ func (p *Parser) ParseStream(userInChan, srvInChan <-chan []byte) (userOut, srvO
 			select {
 			case <-p.closed:
 				return
-			case b, ok := <-userInChan:
+			case msg, ok := <-userInChan:
 				if !ok {
 					return
+				}
+				var b []byte
+				switch msg.Event {
+				case model.DataEvent:
+					b = msg.Body
+				}
+				if len(b) == 0 {
+					continue
 				}
 				b = p.ParseUserInput(b)
 				select {
@@ -161,6 +171,9 @@ func (p *Parser) parseInputState(b []byte) []byte {
 		// 用户又开始输入，并上次不处于输入状态，开始结算上次命令的结果
 		if !p.inputPreState {
 			p.sendCommandRecord()
+			if ps1 := p.cmdOutputParser.GetPs1(); ps1 != "" {
+				p.cmdInputParser.SetPs1(ps1)
+			}
 		}
 	}
 	return b
@@ -168,12 +181,17 @@ func (p *Parser) parseInputState(b []byte) []byte {
 
 // parseCmdInput 解析命令的输入
 func (p *Parser) parseCmdInput() {
-	p.command = p.cmdInputParser.Parse()
+	commands := p.cmdInputParser.Parse()
+	if len(commands) <= 0 {
+		p.command = ""
+	} else {
+		p.command = commands[len(commands)-1]
+	}
 }
 
 // parseCmdOutput 解析命令输出
 func (p *Parser) parseCmdOutput() {
-	p.output = p.cmdOutputParser.Parse()
+	p.output = strings.Join(p.cmdOutputParser.Parse(), "\r\n")
 }
 
 // ParseUserInput 解析用户的输入
@@ -324,7 +342,7 @@ func matchMark(p []byte, marks [][]byte) bool {
 func breakInputPacket(protocolType string) []byte {
 	switch protocolType {
 	case model.ProtocolTelnet:
-		return []byte{telnetlib.IAC, telnetlib.BRK, '\r'}
+		return []byte{tclientlib.IAC, tclientlib.BRK, '\r'}
 	case model.ProtocolSSH:
 		return []byte{utils.CharCleanLine, '\r'}
 	}

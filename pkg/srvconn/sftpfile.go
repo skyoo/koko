@@ -279,6 +279,10 @@ func (ad *AssetDir) loadSystemUsers() {
 			}
 		}
 		ad.suMaps = sus
+		// Todo: Refactor code in the future. Currently just patch gateway bug
+		if detailAsset := service.GetAsset(ad.asset.ID); detailAsset.ID == ad.asset.ID {
+			ad.asset = &detailAsset
+		}
 	})
 }
 
@@ -801,7 +805,7 @@ func (ad *AssetDir) close() {
 
 func (ad *AssetDir) CreateFTPLog(su *model.SystemUser, operate, filename string, isSuccess bool) {
 	data := model.FTPLog{
-		User:       fmt.Sprintf("%s (%s)", ad.user.Name, ad.user.Username),
+		User:       fmt.Sprintf("%s(%s)", ad.user.Name, ad.user.Username),
 		Hostname:   ad.asset.Hostname,
 		OrgID:      ad.asset.OrgID,
 		SystemUser: su.Name,

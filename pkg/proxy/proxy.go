@@ -372,6 +372,11 @@ func (p *ProxyServer) Proxy() {
 		p.sendConnectErrorMsg(err)
 		return
 	}
+	title := fmt.Sprintf("%s://%s@%s",
+		p.SystemUser.Protocol,
+		p.SystemUser.Username,
+		p.Asset.IP)
+	utils.IgnoreErrWriteWindowTitle(p.UserConn, title)
 	logger.Infof("Conn[%s] getting srv conn success", p.UserConn.ID())
 	_ = sw.Bridge(p.UserConn, srvConn)
 	logger.Infof("Conn[%s] end session %s bridge", p.UserConn.ID(), sw.ID)
@@ -384,7 +389,7 @@ func (p *ProxyServer) MapData(s *commonSwitch) map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"id":             s.ID,
-		"user":           fmt.Sprintf("%s (%s)", p.User.Name, p.User.Username),
+		"user":           fmt.Sprintf("%s(%s)", p.User.Name, p.User.Username),
 		"asset":          p.Asset.Hostname,
 		"org_id":         p.Asset.OrgID,
 		"login_from":     p.UserConn.LoginFrom(),
@@ -422,11 +427,13 @@ func (p *ProxyServer) GenerateRecordCommand(s *commonSwitch, input, output strin
 		OrgID:      p.Asset.OrgID,
 		Input:      input,
 		Output:     output,
-		User:       fmt.Sprintf("%s (%s)", p.User.Name, p.User.Username),
+		User:       fmt.Sprintf("%s(%s)", p.User.Name, p.User.Username),
 		Server:     p.Asset.Hostname,
 		SystemUser: p.SystemUser.Username,
 		Timestamp:  time.Now().Unix(),
 		RiskLevel:  riskLevel,
+
+		DateCreated: time.Now(),
 	}
 }
 

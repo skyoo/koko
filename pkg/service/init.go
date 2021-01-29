@@ -42,10 +42,20 @@ func validateAccessAuth() {
 	cf := config.GetConf()
 	maxTry := 30
 	count := 0
+	newKeyTry := 0
 	for {
 		user, err := GetProfile()
 		if err == nil && user.Role == "App" {
 			break
+		}
+		if err == AccessKeyUnauthorized && cf.AccessKey == "" {
+			if newKeyTry > 0 {
+				os.Exit(1)
+			}
+			logger.Error("Access key unauthorized, try to register new access key")
+			registerNewAccessKey()
+			newKeyTry++
+			continue
 		}
 		if err != nil {
 			msg := "Connect server error or access key is invalid, remove %s run again"
@@ -103,8 +113,23 @@ func KeepSyncConfigWithServer(ctx context.Context) {
 		case <-ticker.C:
 			err := LoadConfigFromServer()
 			if err != nil {
-				logger.Warn("Sync config with server error: ", err)
+				logger.Errorf("Sync config with server error: %s", err)
 			}
 		}
 	}
+}
+
+func registerNewAccessKey() {
+	cf := config.GetConf()
+	keyPath := cf.AccessKeyFile
+	if !path.IsAbs(cf.AccessKeyFile) {
+		keyPath = filepath.Join(cf.RootPath, keyPath)
+	}
+	ak := AccessKey{Path: keyPath}
+	err := ak.RegisterKey()
+	if err != nil {
+		logger.Errorf("Register access key failed: %s", err)
+		os.Exit(1)
+	}
+	authClient.SetAuth(ak)
 }

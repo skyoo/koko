@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
+
 var CipherKey = "JumpServer Cipher Key for KoKo !"
 
 type Config struct {
@@ -142,11 +143,14 @@ func (c *Config) LoadFromEnv() error {
 }
 
 func (c *Config) Load(filepath string) error {
-	if err := c.LoadFromYAMLPath(filepath); err == nil {
-		return err
+	var err error
+	log.Print("Config Load from env first")
+	_ = c.LoadFromEnv()
+	if _, err = os.Stat(filepath); err == nil {
+		log.Printf("Config reload from file: %s", filepath)
+		return c.LoadFromYAMLPath(filepath)
 	}
-	log.Print("Load from env")
-	return c.LoadFromEnv()
+	return nil
 }
 
 var lock = new(sync.RWMutex)
@@ -196,11 +200,17 @@ func GetConf() Config {
 	return *Conf
 }
 
+const prefixName = "[KoKo]"
+
 func getDefaultName() string {
 	hostname, _ := os.Hostname()
-	hostRune := []rune(hostname)
-	if len(hostRune) > 32 {
-		hostRune = hostRune[:32]
+	hostRune := []rune(prefixName + hostname)
+	if len(hostRune) <= 32 {
+		return string(hostRune)
 	}
-	return string(hostRune)
+	name := make([]rune, 32)
+	copy(name[:16], hostRune[:16])
+	start := len(hostRune) - 16
+	copy(name[16:], hostRune[start:])
+	return string(name)
 }
